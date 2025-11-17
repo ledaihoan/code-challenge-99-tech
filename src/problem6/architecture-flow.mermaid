@@ -1,0 +1,49 @@
+graph TD
+    subgraph Client
+        A[User Browser] -->|WebSocket Connection| B[WebSocket Server]
+        A -->|1. Start Action| C[POST /api/actions/start]
+        A -->|3. Complete Action| D[POST /api/actions/complete]
+    end
+
+    subgraph API Server
+        C -->|Verify Auth| E[Auth Middleware]
+        D -->|Verify Auth| E
+        E -->|Valid Token| F[Action Controller]
+
+        F -->|Start Action| G[Create ActionAttempt Record]
+        G -->|startedAt timestamp| H[(Database)]
+
+        F -->|Complete Action| I[Validate Attempt]
+        I -->|Check timing/fraud| J{Valid?}
+        J -->|No| K[Reject - 403]
+        J -->|Yes| L{Check Duplicate<br/>within 5min?}
+        L -->|Exists| K
+        L -->|None| M[BEGIN TRANSACTION]
+
+        M -->|Lock Action Row| N[SELECT FOR UPDATE]
+        N -->|Check Points| O{Points<br/>Available?}
+        O -->|No| P[Rollback - 409]
+        O -->|Yes| Q[Award Points]
+
+        Q --> R[Update ActionAttempt]
+        R --> S[Increment User.currentScore]
+        S --> T[Decrement Action.remainingPoints]
+        T -->|COMMIT| U[Success Response]
+
+        U -->|Publish Event| V[Redis Pub/Sub]
+        V -->|Score Update| W[Cache Service]
+        W -->|Update Top 10| X[(Redis Cache)]
+
+        V -->|Broadcast| B
+        B -->|Push Update| A
+    end
+
+    subgraph Background Jobs
+        Y[Leaderboard Updater] -->|Every 5s| X
+        Y -->|Query Top 10| H
+    end
+
+    style M fill:#f9f,stroke:#333,stroke-width:2px
+    style N fill:#faa,stroke:#333,stroke-width:2px
+    style X fill:#bbf,stroke:#333,stroke-width:2px
+    style B fill:#bfb,stroke:#333,stroke-width:2px

@@ -1,0 +1,40 @@
+erDiagram
+    User ||--o{ ActionAttempt : creates
+    Action ||--o{ ActionAttempt : tracks
+    
+    User {
+        uuid id PK
+        string email UK
+        string passwordHash
+        string firstName
+        string lastName
+        int currentScore
+        timestamp createdAt
+        timestamp updatedAt
+    }
+    
+    Action {
+        uuid id PK
+        string title
+        int pointsPerCompletion
+        int totalPointsPool
+        int remainingPoints
+        int minCompletionTime
+        int maxCompletionTime
+        int cooldownSeconds
+        boolean isActive
+        timestamp createdAt
+    }
+    
+    ActionAttempt {
+        uuid id PK
+        uuid userId FK
+        uuid actionId FK
+        timestamp startedAt
+        timestamp completedAt
+        int pointsAwarded
+        string status
+        string clientFingerprint
+        string ipAddress
+        timestamp createdAt
+    }
