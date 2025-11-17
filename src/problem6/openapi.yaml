@@ -72,6 +72,8 @@ paths:
                 $ref: '#/components/schemas/ActionAttempt'
         '400':
           description: Invalid request
+        '409':
+          description: Cooldown period still active for this action
         '429':
           description: Rate limit exceeded
 
@@ -112,7 +114,20 @@ paths:
         '404':
           description: Attempt not found
         '409':
-          description: Action already completed or points depleted
+          description: Action already completed, points depleted, or resource locked
+        '429':
+          description: Cooldown active or rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    enum: [cooldown_active, rate_limit_exceeded]
+                  retryAfter:
+                    type: integer
+                    description: Seconds until next attempt allowed
 
   /actions:
     get:

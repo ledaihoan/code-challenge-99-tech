@@ -16,34 +16,48 @@ graph TD
         F -->|Complete Action| I[Validate Attempt]
         I -->|Check timing/fraud| J{Valid?}
         J -->|No| K[Reject - 403]
-        J -->|Yes| L{Check Duplicate<br/>within 5min?}
-        L -->|Exists| K
-        L -->|None| M[BEGIN TRANSACTION]
 
-        M -->|Lock Action Row| N[SELECT FOR UPDATE]
-        N -->|Check Points| O{Points<br/>Available?}
-        O -->|No| P[Rollback - 409]
-        O -->|Yes| Q[Award Points]
+        J -->|Yes| L[Redis: Check Cooldown Lock]
+        L -->|Lua Script| M{Lock<br/>Acquired?}
+        M -->|Exists| N[Reject - 429 Cooldown]
+        M -->|Success| O[Redis: Token Bucket]
 
-        Q --> R[Update ActionAttempt]
-        R --> S[Increment User.currentScore]
-        S --> T[Decrement Action.remainingPoints]
-        T -->|COMMIT| U[Success Response]
+        O -->|DECR tokens| P{Tokens<br/>Available?}
+        P -->|No| Q[Reject - 429 Rate Limit]
+        P -->|Yes| R[BEGIN TRANSACTION]
 
-        U -->|Publish Event| V[Redis Pub/Sub]
-        V -->|Score Update| W[Cache Service]
-        W -->|Update Top 10| X[(Redis Cache)]
+        R -->|NOWAIT| S[Lock Action Row]
+        S --> T{Points<br/>Available?}
+        T -->|No| U[Rollback - 409]
+        T -->|Yes| V[Award Points]
 
-        V -->|Broadcast| B
+        V --> W[Update ActionAttempt]
+        W --> X[Increment User.currentScore]
+        X --> Y[Decrement Action.remainingPoints]
+        Y -->|COMMIT| Z[Success Response]
+
+        Z -->|Publish Event| AA[Redis Pub/Sub]
+        AA -->|Score Update| AB[Cache Service]
+        AB -->|Update Top 10| AC[(Redis Cache)]
+
+        AA -->|Broadcast| B
         B -->|Push Update| A
     end
 
     subgraph Background Jobs
-        Y[Leaderboard Updater] -->|Every 5s| X
-        Y -->|Query Top 10| H
+        AD[Leaderboard Updater] -->|Every 5s| AC
+        AD -->|Query Top 10| H
     end
 
-    style M fill:#f9f,stroke:#333,stroke-width:2px
-    style N fill:#faa,stroke:#333,stroke-width:2px
-    style X fill:#bbf,stroke:#333,stroke-width:2px
+    subgraph Redis Cluster
+        L -.->|Multi-instance| AE[Redis Zone 1]
+        L -.->|User hash routing| AF[Redis Zone 2]
+        O -.-> AE
+        O -.-> AF
+    end
+
+    style L fill:#fbb,stroke:#333,stroke-width:2px
+    style O fill:#fbb,stroke:#333,stroke-width:2px
+    style S fill:#f9f,stroke:#333,stroke-width:2px
+    style AC fill:#bbf,stroke:#333,stroke-width:2px
     style B fill:#bfb,stroke:#333,stroke-width:2px

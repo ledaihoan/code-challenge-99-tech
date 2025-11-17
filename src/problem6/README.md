@@ -11,11 +11,15 @@ See [architecture-flow.mermaid](./architecture-flow.mermaid) for the complete ex
 ### Key Components
 - **REST API**: Action start/complete endpoints with JWT authentication
 - **WebSocket Server**: Real-time score updates to connected clients
+- **Redis Distributed Locks**: Action cooldown enforcement and rate limiting
 - **Redis Cache**: Top 10 leaderboard with 5-second refresh
-- **Database**: PostgreSQL with optimized indexes for leaderboard queries
+- **Redis Pub/Sub**: Score update event broadcasting
+- **Database**: PostgreSQL with optimized indexes and row-level locking
 
 ## API Specification
 Full OpenAPI 3.0 specification: [openapi.yaml](./openapi.yaml)
+
+Detailed Redis implementation: [redis-implementation.md](./redis-implementation.md)
 
 ### Core Endpoints
 - `POST /api/actions/start` - Initialize action attempt
@@ -45,8 +49,9 @@ See [entity-diagram.mermaid](./entity-diagram.mermaid) for detailed entity relat
 1. **Timing Validation**: Enforce `minCompletionTime` and `maxCompletionTime`
 2. **JWT Authentication**: Validate user identity on each request
 3. **Fingerprinting**: Track `clientFingerprint` and `ipAddress`
-4. **Rate Limiting**: 10 requests/minute per user
-5. **Transaction Locking**: Prevent race conditions on point distribution
+4. **Redis Cooldown Lock**: Atomic check prevents same-action repetition within cooldown period
+5. **Token Bucket Rate Limiting**: Global 10 req/min limit per user across all actions
+6. **Database Transaction Locking**: NOWAIT prevents race conditions on point distribution
 
 ### Authorization Flow
 1. User authenticates → Receives JWT token
@@ -62,35 +67,83 @@ See [entity-diagram.mermaid](./entity-diagram.mermaid) for detailed entity relat
 - **WebSocket**: Broadcast only score deltas, not full leaderboard
 
 ### Scalability Considerations
-- Horizontal scaling: Stateless API servers behind load balancer
-- Redis Pub/Sub: Decouples score updates from WebSocket broadcasting
-- Database connection pooling: Handle concurrent action completions
+- **Horizontal scaling**: Stateless API servers behind load balancer
+- **Redis multi-instance**: Per-zone deployment with user-hash routing for distributed locking
+- **Redis Pub/Sub**: Decouples score updates from WebSocket broadcasting
+- **Database connection pooling**: Handle concurrent action completions
+- **Fail-closed policy**: System rejects requests if Redis unavailable (prevents fraud)
 
 ## Implementation Notes
 
 ### Transaction Flow for Score Update
 ```
-BEGIN TRANSACTION
-  1. Validate ActionAttempt exists and status='started'
-  2. Check timing constraints
-  3. Verify no duplicate attempts (userId + actionId within 5 min window)
-  4. Lock Action row (SELECT FOR UPDATE)
-  5. Verify remainingPoints >= pointsPerCompletion
-  6. Decrement Action.remainingPoints
-  7. Update ActionAttempt (completedAt, pointsAwarded, status)
-  8. Increment User.currentScore
-COMMIT
+1. Redis Cooldown Check (Lua script - atomic)
+   - Key: action_lock:{userId}:{actionId}
+   - If exists → Reject 429 (cooldown active)
+   - If not exists → Set with TTL from Action.cooldownSeconds
+   
+2. Token Bucket Rate Limiting
+   - Key: rate_bucket:{userId}
+   - Decrement token count
+   - If depleted → Reject 429 (rate limit exceeded)
+   
+3. Validate ActionAttempt exists and status='started'
+
+4. Check timing constraints (minCompletionTime, maxCompletionTime)
+
+5. BEGIN DATABASE TRANSACTION
+   - SELECT * FROM actions WHERE id = ? FOR UPDATE NOWAIT
+   - If lock fails → Rollback, Return 409 (resource locked)
+   - Verify remainingPoints >= pointsPerCompletion
+   - If insufficient → Rollback, Return 409 (points depleted)
+   
+6. Update ActionAttempt (completedAt, pointsAwarded, status='completed')
+
+7. Decrement Action.remainingPoints
+
+8. Increment User.currentScore
+
+9. COMMIT
+
+10. Publish event to Redis Pub/Sub for leaderboard update
 ```
 
 ### Locking Mechanisms
-**Action-Level Locking**
-- Row-level lock on Action table prevents race conditions on `remainingPoints`
-- Ensures points pool integrity across concurrent requests
 
-**User-Action Rate Limiting**
-- Query existing ActionAttempts: `WHERE userId = ? AND actionId = ? AND startedAt > NOW() - INTERVAL '5 minutes'`
-- Reject if active attempt exists within cooldown window
-- Prevents rapid-fire exploitation of same action
+**Action-Specific Cooldown (Redis)**
+```lua
+-- Atomic Lua script prevents race conditions
+local key = KEYS[1]
+local ttl = ARGV[1]
+local exists = redis.call('EXISTS', key)
+if exists == 1 then
+    return 0
+end
+redis.call('SETEX', key, ttl, '1')
+return 1
+```
+- Key pattern: `action_lock:{userId}:{actionId}`
+- TTL: Configurable per action via `Action.cooldownSeconds`
+- Latency: ~1-2ms per check
+- Fail-fast: Returns 429 before touching database
+
+**Global Rate Limiting (Token Bucket)**
+- Key pattern: `rate_bucket:{userId}`
+- Limit: 10 requests per minute per user
+- Implementation: Redis DECR with TTL reset
+- Prevents spam attacks across all actions
+
+**Points Pool Locking (Database)**
+- Row-level lock on Action table with `SELECT FOR UPDATE NOWAIT`
+- Ensures points pool integrity across concurrent requests
+- Fails immediately if another transaction holds lock
+- Returns 409 without waiting
+
+**Redis Architecture**
+- Multi-instance deployment per geographic zone
+- User routing by userId hash for horizontal scaling
+- Fail-closed policy: Reject requests if Redis unavailable
+- Acceptable 0.01% race condition tolerance for cooldown bypass
 
 ### WebSocket Message Format
 ```json
@@ -105,10 +158,12 @@ COMMIT
 ```
 
 ## Potential Improvements
-- Configurable cooldown periods per action type
+- Redis cluster with Redlock algorithm for stronger consistency guarantees
+- Circuit breaker pattern for Redis failover scenarios
 - Add exponential backoff for failed action attempts
-- Implement daily/weekly leaderboard variants
-- Add admin dashboard for monitoring fraud patterns
+- Implement daily/weekly leaderboard variants with separate Redis keys
+- Add admin dashboard for monitoring fraud patterns and lock contention
 - Consider sharding User table by score ranges for large scale
 - Add replay protection using nonce in ActionAttempt
-- Implement distributed locks (Redis) for high-concurrency scenarios
+- Implement Redis Sentinel for automatic failover
+- Add metrics for lock acquisition latency and failure rates
