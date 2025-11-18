@@ -1,0 +1,594 @@
+openapi: 3.0.1
+info:
+  title: Location-Based Service API
+  version: 1.0.0
+  description: RESTful APIs for location-based service search system
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development server
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: User
+    description: User profile and location management
+  - name: Stores
+    description: Store search and management
+  - name: Favorites
+    description: User favorites management
+
+paths:
+  /v1/auth/sign-in:
+    post:
+      tags:
+        - Auth
+      summary: Sign in user
+      description: Authenticate user with email and password. Sets httpOnly cookie with refresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user-vn@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: Password123!
+      responses:
+        '200':
+          description: Successfully authenticated
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: refreshToken=abc123; HttpOnly; Secure; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: JWT access token (expires in 15 minutes)
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      description: Get new access token using refresh token from httpOnly cookie
+      responses:
+        '200':
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/auth/sign-out:
+    post:
+      tags:
+        - Auth
+      summary: Sign out user
+      description: Invalidate refresh token and clear httpOnly cookie
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Successfully signed out
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/users/profile:
+    get:
+      tags:
+        - User
+      summary: Get user profile
+      description: Retrieve authenticated user's profile information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      tags:
+        - User
+      summary: Update user profile
+      description: Update authenticated user's profile information
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: John
+                lastName:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: Doe
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/users/location:
+    patch:
+      tags:
+        - User
+      summary: Update user location
+      description: Update authenticated user's current location
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - latitude
+                - longitude
+              properties:
+                address:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                  example: 123 Main St, Hanoi, Vietnam
+                latitude:
+                  type: number
+                  format: double
+                  minimum: -90
+                  maximum: 90
+                  example: 21.028511
+                longitude:
+                  type: number
+                  format: double
+                  minimum: -180
+                  maximum: 180
+                  example: 105.804817
+      responses:
+        '200':
+          description: Location updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/stores/search:
+    get:
+      tags:
+        - Stores
+      summary: Search stores
+      description: Search for stores within radius by name, service types, and countries. Defaults to user's current country.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: query
+          schema:
+            type: string
+          description: Store name search query
+          example: coffee
+        - in: query
+          name: serviceTypes
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          description: Filter by service types
+          example: ["cafe", "restaurant"]
+        - in: query
+          name: latitude
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+          description: Center latitude for radius search
+          example: 21.028511
+        - in: query
+          name: longitude
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+          description: Center longitude for radius search
+          example: 105.804817
+        - in: query
+          name: radius
+          schema:
+            type: number
+            format: double
+            minimum: 0.1
+            maximum: 50
+            default: 5
+          description: Search radius in kilometers
+          example: 5
+        - in: query
+          name: countryIds
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+          description: Filter by country IDs (defaults to user's current country)
+          example: [1, 2]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Number of results per page
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Store'
+                        - type: object
+                          properties:
+                            distance:
+                              type: number
+                              format: double
+                              description: Distance from search center in kilometers
+                              example: 1.23
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 50
+                      total:
+                        type: integer
+                        example: 150
+                      totalPages:
+                        type: integer
+                        example: 3
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/favorites:
+    get:
+      tags:
+        - Favorites
+      summary: Get user favorites
+      description: Retrieve all favorite stores for authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of favorite stores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Favorite'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Favorites
+      summary: Add favorite store
+      description: Add a store to user's favorites
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - storeId
+              properties:
+                storeId:
+                  type: string
+                  format: uuid
+                  example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+      responses:
+        '201':
+          description: Favorite added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Favorite'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Store not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Store already in favorites
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/favorites/{storeId}:
+    delete:
+      tags:
+        - Favorites
+      summary: Remove favorite store
+      description: Remove a store from user's favorites
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: storeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Store ID to remove from favorites
+      responses:
+        '204':
+          description: Favorite removed successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Favorite not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+        email:
+          type: string
+          format: email
+          example: user-vn@example.com
+        firstName:
+          type: string
+          example: User
+        lastName:
+          type: string
+          example: VN
+        countryId:
+          type: integer
+          example: 1
+        address:
+          type: string
+          nullable: true
+          example: 123 Main St, Hanoi, Vietnam
+        latitude:
+          type: number
+          format: double
+          example: 21.028511
+        longitude:
+          type: number
+          format: double
+          example: 105.804817
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Store:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+        name:
+          type: string
+          example: Winmart
+        englishName:
+          type: string
+          example: Winmart Supermarket
+        serviceType:
+          type: string
+          example: supermarket
+        countryId:
+          type: integer
+          example: 1
+        latitude:
+          type: number
+          format: double
+          example: 21.028511
+        longitude:
+          type: number
+          format: double
+          example: 105.804817
+        address:
+          type: string
+          nullable: true
+          example: 123 Main St, Hanoi, Vietnam
+        createdAt:
+          type: string
+          format: date-time
+
+    Favorite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+        userId:
+          type: string
+          format: uuid
+          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+        storeId:
+          type: string
+          format: uuid
+          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+        createdAt:
+          type: string
+          format: date-time
+        store:
+          $ref: '#/components/schemas/Store'
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: UNAUTHORIZED
+        message:
+          type: string
+          example: Invalid credentials
+        statusCode:
+          type: integer
+          example: 401

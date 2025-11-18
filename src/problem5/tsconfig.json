@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    "rootDir": "src", // Add this - only compile from src/
+    "outDir": "dist",
+    "verbatimModuleSyntax": false
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "Node"
+    }
+  },
+  "include": ["src/**/*"], // Add this - only include src/
+  "exclude": ["node_modules", "dist", "test", "prisma", "**/*.test.ts", "**/*.spec.ts"]
+}
