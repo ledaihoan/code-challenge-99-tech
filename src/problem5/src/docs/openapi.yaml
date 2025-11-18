@@ -491,6 +491,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /v1/public/categories:
+    get:
+      tags:
+        - Public
+      summary: Get all categories (public)
+      description: Retrieve all categories in a hierarchical structure (public endpoint)
+      responses:
+        '200':
+          description: List of all categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
   /v1/public/posts/search:
     post:
       tags:
