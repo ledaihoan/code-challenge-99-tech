@@ -50,7 +50,7 @@ describe('errorHandler middleware', () => {
     const res = createMockRes();
     const next = vi.fn() as NextFunction;
 
-    const Schema = z.object({ email: z.string().email() });
+    const Schema = z.object({ email: z.email() });
     let zerr!: ZodError;
     try {
       Schema.parse({ email: 'nope' });

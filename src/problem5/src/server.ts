@@ -5,6 +5,10 @@ import { app } from './app';
 import { env } from './env';
 import { logger } from './lib/logger';
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 // Resolve host/port with safe fallbacks
 const port = Number(env.PORT) || 5000;
 const host = env.HOST ?? '0.0.0.0';

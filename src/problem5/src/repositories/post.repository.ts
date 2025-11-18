@@ -1,12 +1,8 @@
 // src/repositories/post.repo.ts
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import {
-  buildPaginationWhere,
-  buildPaginationResponse,
-  PaginationParams,
-  CursorPaginatedResponseDto,
-} from '../lib/cursor-pagination';
+
+
 
 const createPostRepo = () => {
   const base = prisma.post;

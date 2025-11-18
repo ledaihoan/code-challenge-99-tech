@@ -2,10 +2,12 @@
 
 import { z } from 'zod';
 
-export const SignInBodySchema = z.object({
-  email: z.string().email().trim().toLowerCase(),
-  password: z.string().min(8),
-});
+export const SignInBodySchema = z
+  .object({
+    email: z.email().trim().toLowerCase(),
+    password: z.string().min(8),
+  })
+  .strict();
 
 export type SignInDto = z.infer<typeof SignInBodySchema>;
 

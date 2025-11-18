@@ -1,5 +1,4 @@
 // src/lib/pagination.ts
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 export interface CursorPaginatedResponseDto<T> {
@@ -32,7 +31,7 @@ export type CursorPaginationQuery = z.infer<typeof CursorPaginationQuerySchema>;
 export function buildPaginationWhere<T>(
   params: PaginationParams,
   initialWhere: any = {},
-): { where: any; orderBy: any; take: number } {
+): { where: any; orderBy: any[]; take: number } {
   const sortBy = params.sortBy || 'createdAt';
   const isAsc = params.sortOrder === 'ASC';
   const { limit } = params;
@@ -73,10 +72,7 @@ export function buildPaginationWhere<T>(
     ];
   }
 
-  const orderBy = {
-    [sortBy]: orderDirection,
-    id: orderDirection,
-  };
+  const orderBy = [{ [sortBy]: orderDirection }, { id: orderDirection }];
 
   return {
     where,

@@ -1,5 +1,3 @@
-// src/services/post.service.ts
-import { Prisma } from '@prisma/client';
 import {
   buildPaginationResponse,
   buildPaginationWhere,

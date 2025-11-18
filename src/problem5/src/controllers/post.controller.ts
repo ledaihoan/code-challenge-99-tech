@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { postService } from '../services/post.service';
-import { logger } from '../lib/logger';
 import {
   CreatePostBodySchema,
   UpdatePostBodySchema,
