@@ -1,8 +1,8 @@
 openapi: 3.0.1
 info:
-  title: Location-Based Service API
+  title: Blog API
   version: 1.0.0
-  description: RESTful APIs for location-based service search system
+  description: RESTful APIs for blog system with full-text search
 
 servers:
   - url: http://localhost:5000/api
@@ -12,11 +12,11 @@ tags:
   - name: Auth
     description: Authentication endpoints
   - name: User
-    description: User profile and location management
-  - name: Stores
-    description: Store search and management
-  - name: Favorites
-    description: User favorites management
+    description: User profile management
+  - name: Posts
+    description: Post management (user-specific)
+  - name: Public
+    description: Public endpoints
 
 paths:
   /v1/auth/sign-in:
@@ -38,12 +38,12 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: user-vn@example.com
+                  example: john.doe@example.com
                 password:
                   type: string
                   format: password
                   minLength: 8
-                  example: Password123!
+                  example: password123
       responses:
         '200':
           description: Successfully authenticated
@@ -186,14 +186,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /v1/users/location:
-    patch:
+  /v1/users/{userId}/posts:
+    post:
       tags:
-        - User
-      summary: Update user location
-      description: Update authenticated user's current location
+        - Posts
+      summary: Create a post
+      description: Create a new post for authenticated user
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID (must match authenticated user)
       requestBody:
         required: true
         content:
@@ -201,33 +209,40 @@ paths:
             schema:
               type: object
               required:
-                - latitude
-                - longitude
+                - title
+                - description
+                - body
+                - categoryId
               properties:
-                address:
+                title:
                   type: string
                   minLength: 1
-                  maxLength: 500
-                  example: 123 Main St, Hanoi, Vietnam
-                latitude:
-                  type: number
-                  format: double
-                  minimum: -90
-                  maximum: 90
-                  example: 21.028511
-                longitude:
-                  type: number
-                  format: double
-                  minimum: -180
-                  maximum: 180
-                  example: 105.804817
+                  maxLength: 255
+                  example: Getting Started with TypeScript
+                description:
+                  type: string
+                  minLength: 1
+                  example: Learn the fundamentals of TypeScript
+                body:
+                  type: string
+                  minLength: 1
+                  example: TypeScript has become an essential tool...
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  default: []
+                  example: ["typescript", "programming"]
+                categoryId:
+                  type: integer
+                  example: 1
       responses:
-        '200':
-          description: Location updated successfully
+        '201':
+          description: Post created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Post'
         '400':
           description: Invalid request body
           content:
@@ -241,237 +256,313 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /v1/stores/search:
+  /v1/users/{userId}/posts/{id}:
     get:
       tags:
-        - Stores
-      summary: Search stores
-      description: Search for stores within radius by name, service types, and countries. Defaults to user's current country.
+        - Posts
+      summary: Get post by ID
+      description: Retrieve a specific post by ID (must belong to authenticated user)
       security:
         - bearerAuth: []
       parameters:
-        - in: query
-          name: query
+        - in: path
+          name: userId
+          required: true
           schema:
             type: string
-          description: Store name search query
-          example: coffee
-        - in: query
-          name: serviceTypes
-          schema:
-            type: array
-            items:
-              type: string
-          style: form
-          explode: true
-          description: Filter by service types
-          example: ["cafe", "restaurant"]
-        - in: query
-          name: latitude
+            format: uuid
+          description: User ID
+        - in: path
+          name: id
           required: true
           schema:
-            type: number
-            format: double
-            minimum: -90
-            maximum: 90
-          description: Center latitude for radius search
-          example: 21.028511
-        - in: query
-          name: longitude
+            type: string
+          description: Post ID (bigint)
+      responses:
+        '200':
+          description: Post details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      tags:
+        - Posts
+      summary: Update post
+      description: Update an existing post (must belong to authenticated user)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
           required: true
           schema:
-            type: number
-            format: double
-            minimum: -180
-            maximum: 180
-          description: Center longitude for radius search
-          example: 105.804817
-        - in: query
-          name: radius
+            type: string
+            format: uuid
+          description: User ID
+        - in: path
+          name: id
+          required: true
           schema:
-            type: number
-            format: double
-            minimum: 0.1
-            maximum: 50
-            default: 5
-          description: Search radius in kilometers
-          example: 5
-        - in: query
-          name: countryIds
+            type: string
+          description: Post ID (bigint)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                description:
+                  type: string
+                  minLength: 1
+                body:
+                  type: string
+                  minLength: 1
+                tags:
+                  type: array
+                  items:
+                    type: string
+                categoryId:
+                  type: integer
+      responses:
+        '200':
+          description: Post updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Posts
+      summary: Delete post
+      description: Delete a post (must belong to authenticated user)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
           schema:
-            type: array
-            items:
-              type: integer
-          style: form
-          explode: true
-          description: Filter by country IDs (defaults to user's current country)
-          example: [1, 2]
-        - in: query
-          name: page
+            type: string
+            format: uuid
+          description: User ID
+        - in: path
+          name: id
+          required: true
           schema:
-            type: integer
-            minimum: 1
-            default: 1
-          description: Page number for pagination
+            type: string
+          description: Post ID (bigint)
+      responses:
+        '204':
+          description: Post deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/users/{userId}/posts/search:
+    post:
+      tags:
+        - Posts
+      summary: Search user's posts
+      description: Search posts for a specific user with cursor pagination
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Cursor for pagination (base64 encoded)
         - in: query
           name: limit
           schema:
             type: integer
             minimum: 1
-            maximum: 100
-            default: 50
+            maximum: 1000
+            default: 10
           description: Number of results per page
-      responses:
-        '200':
-          description: Search results
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      allOf:
-                        - $ref: '#/components/schemas/Store'
-                        - type: object
-                          properties:
-                            distance:
-                              type: number
-                              format: double
-                              description: Distance from search center in kilometers
-                              example: 1.23
-                  pagination:
-                    type: object
-                    properties:
-                      page:
-                        type: integer
-                        example: 1
-                      limit:
-                        type: integer
-                        example: 50
-                      total:
-                        type: integer
-                        example: 150
-                      totalPages:
-                        type: integer
-                        example: 3
-        '400':
-          description: Invalid query parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /v1/favorites:
-    get:
-      tags:
-        - Favorites
-      summary: Get user favorites
-      description: Retrieve all favorite stores for authenticated user
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of favorite stores
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Favorite'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-    post:
-      tags:
-        - Favorites
-      summary: Add favorite store
-      description: Add a store to user's favorites
-      security:
-        - bearerAuth: []
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            default: createdAt
+          description: Field to sort by
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          description: Sort order
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - storeId
               properties:
-                storeId:
+                searchText:
                   type: string
-                  format: uuid
-                  example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+                  example: typescript programming
+                categoryIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
       responses:
-        '201':
-          description: Favorite added successfully
+        '200':
+          description: Search results with cursor pagination
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Favorite'
+                type: object
+                properties:
+                  nextCursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for next page (null if no more pages)
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
         '400':
-          description: Invalid request body
+          description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
           description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Store not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '409':
-          description: Store already in favorites
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /v1/favorites/{storeId}:
-    delete:
+  /v1/public/posts/search:
+    post:
       tags:
-        - Favorites
-      summary: Remove favorite store
-      description: Remove a store from user's favorites
-      security:
-        - bearerAuth: []
+        - Public
+      summary: Search all posts (public)
+      description: Search all posts with full-text search and cursor pagination (public endpoint)
       parameters:
-        - in: path
-          name: storeId
-          required: true
+        - in: query
+          name: cursor
           schema:
             type: string
-            format: uuid
-          description: Store ID to remove from favorites
+          description: Cursor for pagination (base64 encoded)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 10
+          description: Number of results per page
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            default: createdAt
+          description: Field to sort by
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          description: Sort order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                authorIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  example: ["dd42bf05-f534-46ba-9af6-1dc681c3c5a3"]
+                searchText:
+                  type: string
+                  example: typescript programming tutorial
+                categoryIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3]
       responses:
-        '204':
-          description: Favorite removed successfully
-        '401':
-          description: Unauthorized
+        '200':
+          description: Search results with cursor pagination
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Favorite not found
+                type: object
+                properties:
+                  nextCursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for next page (null if no more pages)
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
@@ -495,28 +586,16 @@ components:
         email:
           type: string
           format: email
-          example: user-vn@example.com
+          example: john.doe@example.com
         firstName:
           type: string
-          example: User
+          example: John
         lastName:
           type: string
-          example: VN
-        countryId:
-          type: integer
-          example: 1
-        address:
-          type: string
-          nullable: true
-          example: 123 Main St, Hanoi, Vietnam
-        latitude:
-          type: number
-          format: double
-          example: 21.028511
-        longitude:
-          type: number
-          format: double
-          example: 105.804817
+          example: Doe
+        isActive:
+          type: boolean
+          example: true
         createdAt:
           type: string
           format: date-time
@@ -524,61 +603,74 @@ components:
           type: string
           format: date-time
 
-    Store:
+    Category:
       type: object
       properties:
         id:
-          type: string
-          format: uuid
-          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
-        name:
-          type: string
-          example: Winmart
-        englishName:
-          type: string
-          example: Winmart Supermarket
-        serviceType:
-          type: string
-          example: supermarket
-        countryId:
           type: integer
           example: 1
-        latitude:
-          type: number
-          format: double
-          example: 21.028511
-        longitude:
-          type: number
-          format: double
-          example: 105.804817
-        address:
+        name:
           type: string
+          example: Technology
+        fullPathName:
+          type: string
+          example: Technology > Programming
+        slug:
+          type: string
+          example: technology/programming
+        parentId:
+          type: integer
           nullable: true
-          example: 123 Main St, Hanoi, Vietnam
-        createdAt:
-          type: string
-          format: date-time
+          example: null
 
-    Favorite:
+    Post:
       type: object
       properties:
         id:
           type: string
-          format: uuid
-          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+          example: "12345"
+          description: BigInt as string
         userId:
           type: string
           format: uuid
           example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
-        storeId:
+        categoryId:
+          type: integer
+          example: 1
+        title:
           type: string
-          format: uuid
-          example: dd42bf05-f534-46ba-9af6-1dc681c3c5a3
+          example: Getting Started with TypeScript
+        description:
+          type: string
+          example: Learn the fundamentals of TypeScript
+        body:
+          type: string
+          example: TypeScript has become an essential tool...
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["typescript", "javascript", "programming"]
         createdAt:
           type: string
           format: date-time
-        store:
-          $ref: '#/components/schemas/Store'
+        updatedAt:
+          type: string
+          format: date-time
+        category:
+          $ref: '#/components/schemas/Category'
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
 
     Error:
       type: object

@@ -1,7 +1,7 @@
 // src/lib/refresh-token.ts
 import crypto from 'crypto';
 
-// In-memory store (replace with Redis in production)
+// In-memory store for demonstration (replace with Redis in production)
 const refreshTokenStore = new Map<string, { userId: string; expiresAt: number }>();
 
 export const generateRefreshToken = async (userId: string): Promise<string> => {

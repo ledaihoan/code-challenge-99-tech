@@ -1,6 +1,6 @@
 // src/routes/user.routes.ts
 import { Router } from 'express';
-import { getProfile, updateProfile, updateLocation } from '../controllers/user.controller';
+import { getProfile, updateProfile } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth';
 
 const userRouter = Router();

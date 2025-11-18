@@ -33,9 +33,9 @@ describe('rate limiter env overrides', () => {
 
     const { app } = await import('../../src/app');
 
-    await request(app).get('/api/public/health');
+    await request(app).get('/api/v1/public/health');
 
-    const res2 = await request(app).get('/api/public/health');
+    const res2 = await request(app).get('/api/v1/public/health');
     expect(res2.status).toBe(429);
     expect(res2.body).toEqual({
       error: {
