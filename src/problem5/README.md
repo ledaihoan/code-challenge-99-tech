@@ -44,7 +44,6 @@ The system includes:
 ## Environment Configuration
 
 Create a `.env` file in the `src/problem5` directory:
-
 ```env
 # Server Configuration
 NODE_ENV=development
@@ -67,89 +66,50 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX_REQUESTS=100
 ```
 
-## Installation & Setup
+## Quick Start
 
-### Option 1: Using Docker Compose (Recommended)
-
-1. **Start the application with Docker Compose**:
-   ```bash
-   cd src/problem5
-   docker-compose up -d
-   ```
-
-   This will:
-    - Start PostgreSQL database
-    - Run database migrations
-    - Seed initial data
-    - Start the application on port 5000
-
-2. **View logs**:
-   ```bash
-   docker-compose logs -f app
-   ```
-
-3. **Stop the application**:
-   ```bash
-   docker-compose down
-   ```
-
-### Option 2: Local Development Setup
-
-1. **Install dependencies**:
-   ```bash
-   cd src/problem5
-   yarn install
-   ```
-
-2. **Set up PostgreSQL database**:
-   ```bash
-   # Create database
-   createdb blog_db
-
-   # Or using psql
-   psql -U postgres
-   CREATE DATABASE blog_db;
-   ```
-
-3. **Run database migrations**:
-   ```bash
-   yarn migrate:dev
-   ```
-
-4. **Seed the database** (optional):
-   ```bash
-   yarn seed
-   ```
-
-5. **Start development server**:
-   ```bash
-   yarn dev
-   ```
-
-   The server will start on `http://localhost:5000`
-
-## Running the Application
-
-### Development Mode
-
+### Recommended: Full Docker Setup
 ```bash
-# Run with default logging
-yarn dev
-
-# Run with info level logging
-yarn dev:info
-
-# Run with debug logging and pretty print
-yarn dev:debug
+cd src/problem5
+docker-compose up -d --build
 ```
 
-### Production Mode
+> Migrations and seeding are automatically handled. API runs on http://localhost:5000
 
+**Stop**: `docker-compose down`
+
+### Alternative: PostgreSQL Only (Local Development)
+
+**Note**: Update `DATABASE_URL` to use `localhost` instead of `postgres` as hostname.
 ```bash
-# Build the application
-yarn build
+# Start PostgreSQL only
+docker-compose up -d postgres
 
-# Start production server
+# Install dependencies
+yarn install
+
+# Run migrations
+yarn migrate:dev
+
+# Seed database (optional)
+yarn seed
+
+# Start dev server
+yarn dev
+```
+
+## Development
+
+**Start server**: `yarn dev` (default logging)  
+**Debug mode**: `yarn dev:debug` (verbose logging)
+
+Config: `.env` for database URL, JWT secrets, ports, etc.
+
+## Production
+
+**Important**: Set `LOG_PRETTY=false` in production environment for structured JSON logs.
+```bash
+yarn build
 yarn start
 ```
 
@@ -163,28 +123,20 @@ The OpenAPI specification is available at `src/docs/openapi.yaml`.
 
 ## Available Scripts
 
-### Development
-- `yarn dev` - Start development server with auto-reload
-- `yarn dev:debug` - Start with debug logging
-
 ### Database
 - `yarn migrate:dev` - Run migrations (development)
 - `yarn migrate:deploy` - Run migrations (production)
-- `yarn migrate:reset` - Reset database
 - `yarn seed` - Seed database with sample data
 - `yarn prisma:studio` - Open Prisma Studio (database GUI)
 
 ### Code Quality
 - `yarn lint` - Lint code
-- `yarn lint:fix` - Fix linting issues
 - `yarn format` - Format code with Prettier
 - `yarn typecheck` - Type check with TypeScript
 
 ### Testing
 - `yarn test` - Run all tests
-- `yarn test:watch` - Run tests in watch mode
 - `yarn coverage` - Generate test coverage report
-- `yarn test:integration` - Run integration tests only
 
 ### Build
 - `yarn build` - Build for production
@@ -193,14 +145,12 @@ The OpenAPI specification is available at `src/docs/openapi.yaml`.
 ## Default Test Users
 
 After seeding the database, you can use these credentials:
-
 ```json
 {
   "email": "john.doe@example.com",
   "password": "password123"
 }
 ```
-
 ```json
 {
   "email": "jane.smith@example.com",
@@ -315,7 +265,6 @@ POST /api/v1/public/posts/search?cursor=eyJpZCI6IjEyMzQ1Iiwic29ydEJ5IjoiY3JlYXRl
 - When users need to jump to specific pages
 
 ## Project Structure
-
 ```
 src/problem5/
 ├── prisma/
