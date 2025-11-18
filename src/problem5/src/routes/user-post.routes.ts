@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import {
-    createPost,
-    getPostById,
-    updatePost,
-    deletePost,
-    searchUserPosts,
+  createPost,
+  getPostById,
+  updatePost,
+  deletePost,
+  searchUserPosts,
 } from '../controllers/post.controller';
 import { requireAuth } from '../middleware/auth';
 

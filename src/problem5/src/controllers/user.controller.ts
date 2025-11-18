@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { userService } from '../services/user.service';
 import { logger } from '../lib/logger';
-import { UpdateProfileBodySchema, UpdateLocationBodySchema } from '../schemas/user.schema';
+import { UpdateProfileBodySchema } from '../schemas/user.schema';
 
 export const getProfile = async (req: Request, res: Response) => {
   const userId = req.user!.id;

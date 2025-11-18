@@ -232,7 +232,7 @@ paths:
                   items:
                     type: string
                   default: []
-                  example: ["typescript", "programming"]
+                  example: ['typescript', 'programming']
                 categoryId:
                   type: integer
                   example: 1
@@ -536,7 +536,7 @@ paths:
                   items:
                     type: string
                     format: uuid
-                  example: ["dd42bf05-f534-46ba-9af6-1dc681c3c5a3"]
+                  example: ['dd42bf05-f534-46ba-9af6-1dc681c3c5a3']
                 searchText:
                   type: string
                   example: typescript programming tutorial
@@ -628,7 +628,7 @@ components:
       properties:
         id:
           type: string
-          example: "12345"
+          example: '12345'
           description: BigInt as string
         userId:
           type: string
@@ -650,7 +650,7 @@ components:
           type: array
           items:
             type: string
-          example: ["typescript", "javascript", "programming"]
+          example: ['typescript', 'javascript', 'programming']
         createdAt:
           type: string
           format: date-time
